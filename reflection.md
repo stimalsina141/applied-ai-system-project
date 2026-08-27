@@ -7,16 +7,22 @@ Answer each question in 3 to 5 sentences. Be specific and honest about what actu
 - What did the game look like the first time you ran it?
 - List at least two concrete bugs you noticed at the start  
   (for example: "the hints were backwards").
+  - The setup looked decent at the first glance but the logic of the game made it clear there were plenty bugs.
+  - The hints of each game were very misleading and completely wrong.
+  - The range for "easy" and "hard" are determined for each game, for example: for easy it is from 1-20, but the secret number was 98.
+  - The "New Game" button didnt work properly. I had to refresh every time to start a new game.
+  - The attempts allowed was also faulty. The first attempt was not counted in any game played.
+  - The scores after each game was also not correct.
 
 **Bug Reproduction Log**
 
 Document at least 3 bugs you found. Add rows as needed.
 
 | Input | Expected Behavior | Actual Behavior | Console Output / Error |
-|-------|-------------------|-----------------|------------------------|
-| | | | |
-| | | | |
-| | | | |
+| ----- | ----------------- | --------------- | ---------------------- |
+| 20    | Go HIGHER!        | Go LOWER!       |                        |
+| 93    | Go LOWER!         | Go HIGHER!      |                        |
+| 77    | Go HIGHER!        | Go LOWER!       |                        |
 
 ---
 

@@ -1,0 +1,11 @@
+{
+  "title": "Grade calculator",
+  "description": "Letter grades and a class average for a list of scores.",
+  "symptom": "A student who scored exactly 90 got a B instead of an A, and the class average comes out lower than it should.",
+  "error": "",
+  "editable": ["grades.py"],
+  "expected": {
+    "functions": ["letter_grade", "class_average"],
+    "concepts": ["conditional logic", "off-by-one errors"]
+  }
+}

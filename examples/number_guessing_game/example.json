@@ -1,0 +1,11 @@
+{
+  "title": "Number guessing game (Project 1)",
+  "description": "The Streamlit guessing game from codepath-project-1, before any fixes.",
+  "symptom": "The secret number changes every time I click Submit. The hints also seem to point the wrong way, my score sometimes goes up after a wrong guess, and New Game doesn't fully restart.",
+  "error": "",
+  "editable": ["logic_utils.py", "game_state.py"],
+  "expected": {
+    "functions": ["check_guess", "update_score", "init_game", "new_game"],
+    "concepts": ["state management", "type conversion", "conditional logic"]
+  }
+}

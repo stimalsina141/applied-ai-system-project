@@ -1,0 +1,11 @@
+{
+  "title": "Temperature converter",
+  "description": "Converts between Celsius and Fahrenheit.",
+  "symptom": "Converting 212°F gives 194.2°C instead of 100°C, and 0°C is not reported as freezing.",
+  "error": "",
+  "editable": ["temperature.py"],
+  "expected": {
+    "functions": ["fahrenheit_to_celsius", "is_freezing"],
+    "concepts": ["operator precedence", "boundary conditions"]
+  }
+}

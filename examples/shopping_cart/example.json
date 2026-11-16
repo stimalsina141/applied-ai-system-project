@@ -1,0 +1,11 @@
+{
+  "title": "Shopping cart",
+  "description": "Adds items to a cart and totals it with a discount.",
+  "symptom": "A brand new cart already contains items from the previous customer. Also, a 10% discount on a $200 order only takes off $10.",
+  "error": "",
+  "editable": ["cart.py"],
+  "expected": {
+    "functions": ["add_item", "cart_total"],
+    "concepts": ["mutable default arguments", "percentages"]
+  }
+}

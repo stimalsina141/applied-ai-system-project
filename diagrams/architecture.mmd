@@ -1,0 +1,49 @@
+%% AI Debugging Coach - System Architecture
+%% Principle: the AI proposes and reasons; controlled application logic validates and executes.
+
+flowchart TD
+    User([User: pastes code + error / bug description])
+
+    subgraph Input["Input Layer"]
+        Parser[Code and error parser]
+    end
+
+    subgraph AI["AI Reasoning (proposes only)"]
+        Diagnosis["AI diagnosis<br/>confirmed / likely / unknown + confidence"]
+        Explain[Beginner-friendly explanation]
+        Planner["Fix planner<br/>identifies function / line first"]
+        Patch[Patch generator<br/>minimal change]
+        Evaluator["Test-result evaluator<br/>explains failures"]
+    end
+
+    subgraph Control["Controlled Application Logic (validates and executes)"]
+        Diff[Diff preview]
+        Approval{User approves?}
+        Runner["Controlled test runner<br/>pytest only, timeout, project dir only"]
+        Retry{"Tests pass?<br/>attempts < 3?"}
+    end
+
+    Report["Final report<br/>status, root cause, changes, validation,<br/>concept learned, code quality, concerns"]
+    Logger[(Logger<br/>workflow events)]
+
+    User --> Parser
+    Parser --> Diagnosis
+    Diagnosis --> Explain
+    Explain --> Planner
+    Planner --> Patch
+    Patch --> Diff
+    Diff --> Approval
+    Approval -- No --> Report
+    Approval -- Yes --> Runner
+    Runner --> Evaluator
+    Evaluator --> Retry
+    Retry -- "Fail, attempts left" --> Planner
+    Retry -- "Pass" --> Report
+    Retry -- "Fail, limit reached" --> Report
+    Report --> User
+
+    Parser -.-> Logger
+    Diagnosis -.-> Logger
+    Patch -.-> Logger
+    Runner -.-> Logger
+    Report -.-> Logger

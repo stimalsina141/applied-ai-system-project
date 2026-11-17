@@ -45,11 +45,7 @@ class Diagnosis(BaseModel):
         )
     )
     small_example: str = Field(
-        description=(
-            "Only Python code (no prose, no markdown fences): a tiny standalone example of the "
-            "concept that uses different names and values from the learner's code and does not "
-            "contain the fix. Or an empty string."
-        )
+        description="A tiny standalone code example that illustrates the concept, or an empty string."
     )
 
 

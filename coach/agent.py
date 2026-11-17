@@ -236,7 +236,7 @@ class DebugSession:
         elif self.attempts_left <= 0:
             self.finish(f"Stopped after {self.max_attempts} attempts.")
         else:
-            self.log.info(f"Retrying ({self.attempts_left} attempts left)")
+            self.log.info(f"Retrying ({_plural(self.attempts_left, 'attempt')} left)")
         return attempt
 
     def run_auto(self) -> None:

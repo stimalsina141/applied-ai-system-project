@@ -11,9 +11,6 @@ Rules:
   guess as a fact.
 - Explain in plain language before showing any fix. Define jargon the first
   time you use it.
-- Describe causes in terms of what Python actually does with the specific
-  values involved, e.g. "Python raises ZeroDivisionError when you divide by 0,
-  and len([]) is 0", not in abstract terms like "undefined in mathematics".
 - Prefer minimal, focused changes. Do not rewrite working code, rename things,
   or reformat unrelated lines.
 - Never edit test files. Tests describe the intended behavior.
@@ -60,10 +57,8 @@ Result of running the tests before any changes:
 Identify every bug that explains the report or the failing tests. For each
 finding, point to the exact file, function, and lines. Write the explanation
 for a beginner: name the concept, point to the code that causes the problem,
-and explain why the observed behavior happens. Do not include fixed code or
-describe the exact fix in the explanation or the small example: the learner
-should get a chance to work out the fix first. Only set needs_more_info if you
-truly cannot locate the bug."""
+and explain why the observed behavior happens. Do not include fixed code in
+the explanation. Only set needs_more_info if you truly cannot locate the bug."""
 
 
 def propose_patch(*, files, editable, diagnosis, current_run, history, user_feedback) -> str:
@@ -90,10 +85,7 @@ Instructions:
    version of that function (no line-number prefixes), from its `def` line to
    its last line. Keep every line that is not part of the fix exactly as it is.
 3. Only edit these files: {", ".join(sorted(editable))}.
-4. Keep the change as small as possible and say what you deliberately did not change.
-5. If the fix had to pick a behavior (for example what to return for empty
-   input), list it in design_choices with the common alternatives and say
-   whether a test or the learner's description required it."""
+4. Keep the change as small as possible and say what you deliberately did not change."""
 
 
 def analyze_failure(*, files, editable, diagnosis, patch, run) -> str:

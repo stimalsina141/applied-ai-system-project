@@ -1,49 +1,43 @@
 %% AI Debugging Coach - System Architecture
-%% Principle: the AI proposes and reasons; controlled application logic validates and executes.
+%% The AI proposes and reasons; controlled application logic validates and executes.
+%% Legend: blue = AI model (free local Qwen2.5-Coder via Ollama by default), gray = application logic, green = testing check, orange = human check
 
 flowchart TD
-    User([User: pastes code + error / bug description])
+    IN[/"INPUT<br/>buggy Python code, tests,<br/>error message, bug description"/]
 
-    subgraph Input["Input Layer"]
-        Parser[Code and error parser]
+    subgraph AGENT["Agent loop (coach/agent.py) - max 3 attempts"]
+        BASE["Tester: run tests<br/>before any change"]
+        DIAG["AI Diagnoser<br/>finds the bug, labels each finding<br/>confirmed / likely / unknown,<br/>rates confidence, explains it simply"]
+        PATCH["AI Fixer<br/>names the target function,<br/>then writes its fixed version"]
+        GUARD{"Guardrails<br/>only the declared function?<br/>valid Python? tests untouched?"}
+        HUMAN{"Learner reviews diff<br/>approve or reject"}
+        TEST["Tester: sandboxed pytest<br/>temp copy, fixed command, timeout"]
+        KEEP{"Evaluator<br/>fewer failures and<br/>nothing newly broken?"}
+        ANALYZE["AI Analyzer<br/>explains failing tests,<br/>suggests next step"]
     end
 
-    subgraph AI["AI Reasoning (proposes only)"]
-        Diagnosis["AI diagnosis<br/>confirmed / likely / unknown + confidence"]
-        Explain[Beginner-friendly explanation]
-        Planner["Fix planner<br/>identifies function / line first"]
-        Patch[Patch generator<br/>minimal change]
-        Evaluator["Test-result evaluator<br/>explains failures"]
-    end
+    OUT[/"OUTPUT<br/>status from test results, diff, fixed file,<br/>reliability table, report, follow-up chat"/]
+    EVAL[["Reliability eval (eval/run_eval.py)<br/>runs all examples against known answers:<br/>fix rate, diagnosis accuracy, consistency"]]
+    REVIEW[["Human evaluation<br/>(eval/human_review.md)<br/>person grades AI explanations"]]
+    LOG[("Workflow log<br/>logs/coach.log")]
 
-    subgraph Control["Controlled Application Logic (validates and executes)"]
-        Diff[Diff preview]
-        Approval{User approves?}
-        Runner["Controlled test runner<br/>pytest only, timeout, project dir only"]
-        Retry{"Tests pass?<br/>attempts < 3?"}
-    end
+    IN --> BASE --> DIAG --> PATCH --> GUARD
+    GUARD -- blocked --> PATCH
+    GUARD -- ok --> HUMAN
+    HUMAN -- "reject + reason" --> PATCH
+    HUMAN -- approve --> TEST --> KEEP
+    KEEP -- "tests still failing<br/>and attempts left" --> ANALYZE --> PATCH
+    KEEP -- "all pass or<br/>no attempts left" --> OUT
 
-    Report["Final report<br/>status, root cause, changes, validation,<br/>concept learned, code quality, concerns"]
-    Logger[(Logger<br/>workflow events)]
+    EVAL -. "runs the same loop" .-> AGENT
+    OUT -.-> REVIEW
+    AGENT -.-> LOG
 
-    User --> Parser
-    Parser --> Diagnosis
-    Diagnosis --> Explain
-    Explain --> Planner
-    Planner --> Patch
-    Patch --> Diff
-    Diff --> Approval
-    Approval -- No --> Report
-    Approval -- Yes --> Runner
-    Runner --> Evaluator
-    Evaluator --> Retry
-    Retry -- "Fail, attempts left" --> Planner
-    Retry -- "Pass" --> Report
-    Retry -- "Fail, limit reached" --> Report
-    Report --> User
-
-    Parser -.-> Logger
-    Diagnosis -.-> Logger
-    Patch -.-> Logger
-    Runner -.-> Logger
-    Report -.-> Logger
+    classDef ai fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef app fill:#f3f4f6,stroke:#6b7280,color:#111827
+    classDef test fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef human fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+    class DIAG,PATCH,ANALYZE ai
+    class GUARD,IN,OUT,LOG app
+    class BASE,TEST,KEEP,EVAL test
+    class HUMAN,REVIEW human

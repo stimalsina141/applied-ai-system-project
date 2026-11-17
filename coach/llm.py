@@ -35,26 +35,36 @@ def api_key_available() -> bool:
     return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))
 
 
-def llm_status() -> tuple[bool, str]:
-    """Whether the configured model can be used right now, and a message for the user."""
+def local_models() -> list[str] | None:
+    """Names of the models downloaded in Ollama, or None if Ollama is not running."""
+    try:
+        models = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=3).json().get("models", [])
+    except (requests.RequestException, ValueError):
+        return None
+    return sorted(m["name"].removesuffix(":latest") for m in models if m.get("name"))
+
+
+def llm_status(model: str | None = None) -> tuple[bool, str]:
+    """Whether the model can be used right now, and a message for the user."""
+    model = model or config.MODEL
     if config.PROVIDER == "claude":
         if api_key_available():
             return True, "Anthropic API key found"
         return False, "No Anthropic API key. Add one to `.env`, or set COACH_PROVIDER=ollama to use a free local model."
     if config.PROVIDER != "ollama":
         return False, f"Unknown COACH_PROVIDER {config.PROVIDER!r}. Use 'ollama' or 'claude'."
-    try:
-        models = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=3).json().get("models", [])
-    except (requests.RequestException, ValueError):
+    names = local_models()
+    if names is None:
         return False, "Ollama is not running. Start it with `ollama serve` (see README setup)."
-    names = {m.get("name") for m in models}
-    if config.MODEL not in names and f"{config.MODEL}:latest" not in names:
-        return False, f"Model `{config.MODEL}` is not downloaded. Run `ollama pull {config.MODEL}`."
-    return True, f"Local model ready: {config.MODEL}"
+    if model.removesuffix(":latest") not in names:
+        return False, f"Model `{model}` is not downloaded. Run `ollama pull {model}`."
+    return True, f"Local model ready: {model}"
 
 
-def create_llm() -> "LLM":
-    return ClaudeLLM() if config.PROVIDER == "claude" else OllamaLLM()
+def create_llm(model: str | None = None) -> "LLM":
+    if config.PROVIDER == "claude":
+        return ClaudeLLM(model or config.MODEL)
+    return OllamaLLM(model or config.MODEL)
 
 
 class OllamaLLM:

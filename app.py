@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 from coach import config
 from coach.agent import STATUS_LABELS, DebugSession, SessionError
 from coach.examples import list_examples
-from coach.llm import LLMError, create_llm, llm_status
-from coach.report import build_report, reliability_rows
+from coach.llm import LLMError, create_llm, llm_status, local_models
+from coach.report import build_report, reliability_rows, split_code
 from coach.workspace import Workspace, WorkspaceError
 
 load_dotenv()
@@ -41,23 +41,40 @@ with st.sidebar:
     st.header("🩺 AI Debugging Coach")
     st.caption("Understand, fix, and verify Python bugs.")
 
-    model_ready, model_message = llm_status()
+    active: DebugSession | None = st.session_state.get("session")
+
+    st.subheader("Settings")
+    model = config.MODEL
+    if config.PROVIDER == "ollama":
+        downloaded = local_models() or []
+        choices = sorted(set(downloaded) | {config.MODEL})
+        model = st.selectbox(
+            "Model", choices, index=choices.index(config.MODEL), disabled=active is not None,
+            help="Models downloaded with `ollama pull`. Bigger models (e.g. qwen2.5-coder:7b) "
+                 "fix harder bugs but need more memory and time.",
+        )
+        st.caption("Free, runs locally with Ollama.")
+    else:
+        st.caption(f"Model: `{model}` (Claude API) · effort `{config.EFFORT}`")
+
+    model_ready, model_message = llm_status(model)
     if model_ready:
         st.success(model_message, icon="🤖")
     else:
         st.error(model_message, icon="🤖")
 
-    st.subheader("Settings")
     auto_mode = st.toggle(
         "Run automatically", value=False,
         help="Off: you review and approve each patch before tests run. "
              "On: the coach runs the whole loop by itself (still only in a sandbox).",
     )
-    max_attempts = st.slider("Max repair attempts", 1, config.MAX_ATTEMPTS, config.MAX_ATTEMPTS)
-    if config.PROVIDER == "claude":
-        st.caption(f"Model: `{config.MODEL}` (Claude API) · effort `{config.EFFORT}`")
-    else:
-        st.caption(f"Model: `{config.MODEL}` (free, runs locally with Ollama)")
+    max_attempts = st.slider(
+        "Max repair attempts", 1, config.MAX_ATTEMPTS, config.MAX_ATTEMPTS, disabled=active is not None,
+        help="The most patches the coach may try before stopping. It is a limit, not a countdown.",
+    )
+    if active is not None:
+        st.caption(f"Attempts used: **{len(active.attempts)} of {active.max_attempts}**. "
+                   "Model and attempt limit are fixed for this session; click Start over to change them.")
 
     if st.button("Start over", width="stretch"):
         st.session_state.pop("session", None)
@@ -119,7 +136,7 @@ if session is None:
         try:
             if workspace is None:
                 workspace = Workspace.from_paste(code, tests, filename=filename, symptom=symptom, error=error)
-            new_session = DebugSession(workspace, create_llm(), max_attempts=max_attempts)
+            new_session = DebugSession(workspace, create_llm(model), max_attempts=max_attempts)
         except WorkspaceError as e:
             st.error(str(e))
             st.stop()
@@ -164,9 +181,19 @@ if d:
 
     st.header("3. Explanation")
     st.markdown(f"**Concept:** {d.concept}")
-    st.write(d.explanation)
-    if d.small_example.strip():
-        st.code(d.small_example, language="python")
+    explanation, explanation_code = split_code(d.explanation)
+    example_prose, example_code = split_code(d.small_example)
+    st.write(explanation)
+    code = "\n\n".join(c for c in (explanation_code, example_code) if c)
+    if session.done and (code or example_prose):
+        st.markdown("**Example**")
+        if example_prose:
+            st.write(example_prose)
+        if code:
+            st.code(code, language="python")
+    elif code or example_prose:
+        st.caption("💡 The code example is hidden until the fix has been tested, "
+                   "so you can try to work out the fix yourself first.")
 
 # 4. Patches and test results
 if session.attempts or (session.phase == "diagnosed" and not session.done):
@@ -215,6 +242,8 @@ if session.phase == "diagnosed" and not session.done:
     last = session.attempts[-1] if session.attempts else None
     feedback = last.user_feedback if last and last.state == "rejected" else ""
     label = "Propose a fix" if not last else f"Try another fix ({session.attempts_left} left)"
+    st.caption("Click to generate a patch. Nothing runs until you approve it."
+               if not auto_mode else "Run automatically is on: the coach will propose, test and retry by itself.")
     c1, c2, _ = st.columns([1, 1, 3])
     if c1.button(label, type="primary"):
         if auto_mode:

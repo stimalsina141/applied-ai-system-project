@@ -29,6 +29,10 @@ STATUS_LABELS = {
 }
 
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 class SessionError(Exception):
     """An action was requested that the current phase does not allow."""
 
@@ -70,9 +74,11 @@ class DebugSession:
         self.quality: QualityReview | None = None
         self.chat: list[dict] = []
 
+        n_tests = len(workspace.test_files)
         self.log.info(
-            f"Session started: {workspace.name} ({len(workspace.files)} files, "
-            f"{len(workspace.test_files)} test files, max {max_attempts} attempts)"
+            f"Session started: {workspace.name}. {_plural(len(workspace.files), 'file')} "
+            f"({', '.join(workspace.files)}), {_plural(n_tests, 'test file')}, "
+            f"max {_plural(max_attempts, 'attempt')}"
         )
 
     # ----- convenience -------------------------------------------------

@@ -1,5 +1,32 @@
 """The final educational debugging report and reliability summary."""
+import ast
+import re
+
 from coach.agent import STATUS_LABELS, DebugSession
+
+_FENCE = re.compile(r"```[a-zA-Z0-9_+-]*\n(.*?)```", re.DOTALL)
+
+
+def split_code(text: str) -> tuple[str, str]:
+    """Separate model output into (prose, code), however the model mixed them.
+
+    Fenced blocks become code and the remaining text becomes prose. Text with
+    no fences counts as code only if it parses as Python.
+    """
+    text = text.strip()
+    blocks = _FENCE.findall(text)
+    if blocks:
+        prose = _FENCE.sub("\n", text).replace("```", "")
+        return re.sub(r"\n{3,}", "\n\n", prose).strip(), "\n\n".join(b.strip() for b in blocks)
+    try:
+        ast.parse(text)
+    except SyntaxError:
+        return text, ""
+    return "", text
+
+
+def _tests_run(session: DebugSession) -> int:
+    return session.current_run.total if session.current_run else 0
 
 
 def reliability_rows(session: DebugSession) -> list[tuple[str, str]]:
@@ -37,7 +64,11 @@ def _scope_result(session: DebugSession) -> str:
     if not session.kept_attempts:
         return "No changes kept"
     extra = session.out_of_scope_changes()
-    return "Not detected" if not extra else "Changes outside declared targets: " + ", ".join(extra)
+    if extra:
+        return "Changes outside declared targets: " + ", ".join(extra)
+    if not session.has_tests:
+        return "Only the declared functions changed; no tests checked their behavior"
+    return f"Not detected by the {_tests_run(session)} provided tests (only the declared functions changed)"
 
 
 def build_report(session: DebugSession) -> str:
@@ -71,6 +102,14 @@ def build_report(session: DebugSession) -> str:
                 lines.append(f"  - Assumption: {assumption}")
     else:
         lines.append("No changes were kept.")
+    choices = [c for a in session.kept_attempts for c in a.proposal.design_choices]
+    if choices:
+        lines += ["", "Design choices (other behaviors would also be reasonable):"]
+        lines += [f"- {c}" for c in choices]
+    elif session.kept_attempts and session.has_tests:
+        lines += ["", "Design choices: where your tests specify a behavior (for example what an edge case "
+                      "returns), the fix follows your tests. That behavior was chosen by the tests, not "
+                      "by the coach, and other choices could also be reasonable."]
     discarded = [a for a in session.attempts if not a.kept]
     if discarded:
         lines += ["", "Attempts that were not kept:"]
@@ -112,7 +151,13 @@ def build_report(session: DebugSession) -> str:
 
     lines += ["## Remaining concerns", ""]
     concerns = _remaining_concerns(session)
-    lines += [f"- {c}" for c in concerns] if concerns else ["None identified."]
+    if concerns:
+        lines += [f"- {c}" for c in concerns]
+    elif session.has_tests:
+        lines.append(f"None found by the {_tests_run(session)} provided tests. Inputs and behavior "
+                     "the tests don't cover were not checked.")
+    else:
+        lines.append("None identified, but nothing was verified by tests.")
     return "\n".join(lines) + "\n"
 
 

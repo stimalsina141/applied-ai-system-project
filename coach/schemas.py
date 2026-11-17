@@ -45,7 +45,11 @@ class Diagnosis(BaseModel):
         )
     )
     small_example: str = Field(
-        description="A tiny standalone code example that illustrates the concept, or an empty string."
+        description=(
+            "Only Python code (no prose, no markdown fences): a tiny standalone example of the "
+            "concept that uses different names and values from the learner's code and does not "
+            "contain the fix. Or an empty string."
+        )
     )
 
 
@@ -76,6 +80,14 @@ class PatchProposal(BaseModel):
         description='What changed and what did not, e.g. "No scoring or hint logic was changed."'
     )
     assumptions: list[str]
+    design_choices: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Behavior the fix had to choose, the common alternatives, and what decided it, e.g. "
+            '"Returns 0 for an empty list because test_average_empty requires it; returning '
+            'None or raising ValueError are common alternatives." Empty if there was no choice.'
+        ),
+    )
 
 
 class FailedTestExplanation(BaseModel):

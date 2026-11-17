@@ -103,8 +103,8 @@ ollama pull qwen2.5-coder:3b       # in a second tab; about 1.9 GB
 **2. Install the project:**
 
 ```bash
-git clone <this-repo-url>
-cd applied-si-system-project
+git clone https://github.com/stimalsina141/applied-ai-system-project.git
+cd applied-ai-system-project
 
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -154,6 +154,62 @@ python -m eval.run_eval --runs 2     # scores the real AI on every example (abou
 These are real outputs from the free local model (`qwen2.5-coder:3b`),
 lightly trimmed. The full transcripts are in
 [`eval/results/transcripts/20261116-200650/`](eval/results/transcripts/20261116-200650/).
+
+### End to end from the command line
+
+```bash
+$ python -m coach --example grade_calculator
+```
+
+```text
+Debugging Grade calculator (session d8f22fe2)...
+
+--- Attempt 1: grades.py ---
+@@ -1,19 +1,17 @@
+ def letter_grade(score):
+-    """Turn a 0-100 score into a letter. 90 and above is an A."""
+-    if score > 90:
++    if score >= 90:
+         ...
+ def class_average(scores):
+-    total = 0
+-    for i in range(1, len(scores)):
+-        total += scores[i]
++    if not scores:
++        return 0
++    total = sum(scores)
+     return total / len(scores)
+
+# Debugging Report
+
+**Status:** Fixed
+**Why it stopped:** All tests pass.
+**Attempts used:** 1 of 3
+
+## Root cause
+The condition score > 90 is not inclusive, so a score of 90 is not correctly
+identified as an 'A'. The class_average function is also incorrect ...
+Confidence: high
+
+## Validation
+- Before: 3 passed, 6 failed in 0.24s
+- After: 9 passed in 0.46s
+
+| Check                      | Result                                                        |
+|----------------------------|---------------------------------------------------------------|
+| Original bug addressed     | 6 of 6 failing tests now pass                                 |
+| Existing tests preserved   | 3 of 3 still pass                                             |
+| Full test suite            | 9 passed in 0.46s                                             |
+| Unrelated behavior changed | Not detected by the 9 provided tests (only the declared       |
+|                            | functions changed)                                            |
+
+## Remaining concerns
+None found by the 9 provided tests. Inputs and behavior the tests don't
+cover were not checked.
+```
+
+The exit code is 0 only when the status is **Fixed**, so the command can be
+used in scripts.
 
 ### 1. Grade calculator: fixed on the first try
 
@@ -248,6 +304,19 @@ claim success.
 **Result:** **Partially fixed.** 3 passed, 1 failed. The discount bug in
 `cart_total` was diagnosed but never patched.
 
+### Guardrails and the evaluator in action
+
+Real behavior from the runs above and from hands-on testing:
+
+| Input | What the AI did | What the system did | Result |
+|---|---|---|---|
+| Shopping cart, attempt 1 | Wrote a new `add_item` with an unclosed `{` | Guardrail: *"the new code has a syntax error on line 4: '{' was never closed"* | Blocked before running; counted as an attempt |
+| Number guessing game, attempts 1–2 | Returned code that wasn't a single complete `init_game` function | Guardrail: *"`new_code` must be the complete function, starting with `def init_game(`, and nothing else"* | Blocked; attempt 3 produced a valid fix |
+| Shopping cart, attempt 3 | Replaced the correct `cart=None` fix with `cart = []` | Evaluator: *"it broke 1 test(s) that passed before: test_add_to_existing_cart"* | Discarded; the earlier good fix was kept |
+| `add(2, 3) == 6`, a test that can never pass (max 2 attempts) | Proposed `a + b` twice | Evaluator: *"no improvement (1 failing before and after)"* | **Unable to fix** after 2 of 2, never "Fixed" |
+| Code pasted with no tests | Proposed a fix | No tests means no proof | **Not verified**, never "Fixed" |
+| Code example that contains the fix | Put the fixed function in its "small example" | The app hides code examples until the fix has been tested | The learner sees the explanation first |
+
 ## Design decisions
 
 | Decision | Why | Trade-off |
@@ -332,10 +401,12 @@ explanations that give away the fix.
 - an abstract root cause ("undefined in mathematics")
 - a confusing attempts slider
 
-All six are fixed and covered by tests (section 3 of the review table). The
-re-test also exposed problems I couldn't fix in code: a wrong explanation
-for an `is_even` bug that was still fixed correctly, and a confidently wrong
-answer to a follow-up question.
+Five are fixed in the app and covered by tests (section 3 of the review
+table). The sixth, the root-cause wording, I fixed with a prompt rule and
+then **reverted**: the same rule made the grade calculator fail 3 of 3 runs
+after it had been fixed 2 of 2. The re-test also exposed problems I couldn't
+fix in code: the model failed an `is_even` logic bug, and it gave confidently
+wrong answers to a follow-up question.
 
 **What worked:** separating "the AI proposes" from "the app decides" made
 the system testable. Every rule (keep/discard, final status, guardrails) is
@@ -353,6 +424,10 @@ plain Python with a unit test.
 - The free 3B model is the weakest link. It usually fixes one bug per
   session and then repeats itself. Its failure analysis often just says
   "Retry the patch," which gives the next attempt nothing to work with.
+- The small model is fragile to prompt wording. One extra sentence in the
+  system prompt flipped two examples, one from fixed to failing and the
+  other from failing to fixed. Any prompt change has to be re-checked with
+  the evaluation script, not just one manual try.
 - Follow-up chat answers aren't checked by anything. When asked "What if the
   list contains None?", the model said `sum()` returns 0, but it actually
   raises `TypeError`.
@@ -387,16 +462,19 @@ appear in the app's **Workflow log** panel. The log holds file names, counts
 and short summaries only, never source code or keys:
 
 ```text
-INFO    [6a4aff34] Session started: Number guessing game (Project 1) (4 files, 2 test files, max 3 attempts)
-INFO    [6a4aff34] Baseline: 11 passed, 17 failed in 0.47s
-INFO    [6a4aff34] Diagnosis generated: Game state management and logic (confidence high; 3 confirmed, 0 likely, 0 unknown)
-WARNING [6a4aff34] Attempt 1: patch blocked by guardrail: Edit 1 (game_state.py, init_game): `new_code` must be the complete function, ...
-WARNING [6a4aff34] Attempt 2: patch blocked by guardrail: Edit 1 (game_state.py, init_game): `new_code` must be the complete function, ...
-INFO    [6a4aff34] Attempt 3: patch proposed for game_state.py:init_game (+6 -6 lines)
-INFO    [6a4aff34] Attempt 3: 12 passed, 16 failed in 0.47s
-INFO    [6a4aff34] Attempt 3: patch kept (failures went from 17 to 16)
-INFO    [6a4aff34] Final status: Partially fixed. Stopped after 3 attempts.
+INFO    [d8f22fe2] Session started: Grade calculator. 2 files (grades.py, tests/test_grades.py), 1 test file, max 3 attempts
+INFO    [d8f22fe2] Baseline: 3 passed, 6 failed in 0.24s
+INFO    [d8f22fe2] Diagnosis generated: Conditional statements and loops (confidence high; 2 confirmed, 0 likely, 0 unknown)
+INFO    [d8f22fe2] Attempt 1: patch proposed for grades.py:class_average, grades.py:letter_grade (+12 -14 lines)
+INFO    [d8f22fe2] Attempt 1: approved, running pytest
+INFO    [d8f22fe2] Attempt 1: 9 passed in 0.46s
+INFO    [d8f22fe2] Attempt 1: patch kept (all tests pass)
+INFO    [d8f22fe2] Final status: Fixed. All tests pass.
 ```
+
+Full per-attempt traces (plan, diff, guardrail decision, test result,
+keep/discard reason and failure analysis) are saved for every evaluation run
+and collected in [`ai_interactions.md`](ai_interactions.md).
 
 ## Project structure
 
@@ -409,6 +487,8 @@ tests/                  Offline test suite for the coach
 diagrams/               Mermaid architecture source
 assets/                 Rendered architecture image
 original_project/       codepath-project-1, preserved
+model_card.md           Limitations, misuse, testing surprises, AI collaboration
+ai_interactions.md      The agent's saved reasoning traces (decision chain per attempt)
 ```
 
 ## Reflection

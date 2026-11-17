@@ -51,6 +51,28 @@ better-quality option (the Claude API) costs money. So the quality of help a
 student gets depends on their hardware or their budget. It only supports
 Python, and its explanations are in English.
 
+## Future improvements
+
+- **A stronger free model.** On a computer with 16 GB of RAM,
+  `qwen2.5-coder:7b` can be picked in the sidebar. Re-running the evaluation
+  with it would show how much of the 20% fix rate is the model and how much
+  is the design.
+- **Better retry feedback.** The failure analysis often says just "Retry the
+  patch." Feeding the exact failing assertion back to the fixer, instead of
+  relying on the model's summary, should make attempts 2 and 3 more useful.
+- **Fix one function per attempt.** The model does best with one bug at a
+  time. On multi-bug projects, the coach could target the function with the
+  most failing tests first.
+- **Check the explanation, not just the code.** For example, ask the model
+  to predict a failing test's output from its explanation, and compare that
+  to the real output.
+- **A "hints only" mode** that never shows a patch, for learners who want to
+  fix the bug themselves.
+- **A real sandbox** (a container with no network) so untrusted code can be
+  run safely.
+- **Verify follow-up answers** by running small snippets the answer makes
+  claims about (for example `sum([None])`) before showing it.
+
 ## Misuse and prevention
 
 | Possible misuse | How the system limits it | What remains |
@@ -96,7 +118,16 @@ Python, and its explanations are in English.
    meant "not detected by my two tests", and returning 0 for an empty list
    was presented as the only answer when it was really a choice my test made.
 
-7. **Retries often repeated the same idea.** The failure analysis frequently
+7. **One sentence in the prompt flipped the results.** To fix the root-cause
+   wording, I added a rule asking for explanations in terms of what Python
+   does. The `average` explanation got better, but the grade calculator,
+   which had been fixed in every run, started failing every run, while
+   `is_even` went the other way. I reverted the rule, because the evaluation
+   numbers were measured without it. A small model at temperature 0 is very
+   sensitive to wording, which is why prompt changes need the full
+   evaluation, not one manual check.
+
+8. **Retries often repeated the same idea.** The failure analysis frequently
    said only "Retry the patch," which gave the next attempt nothing new, so
    attempts 2 and 3 often produced the same result.
 

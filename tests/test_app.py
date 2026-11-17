@@ -12,9 +12,9 @@ APP = Path(__file__).resolve().parent.parent / "app.py"
 
 @pytest.fixture
 def app(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     llm = ScriptedLLM(diagnosis(), patch("a - b", "a + b"), quality(), "Minus subtracts.")
-    monkeypatch.setattr(coach.llm, "ClaudeLLM", lambda *a, **k: llm)
+    monkeypatch.setattr(coach.llm, "llm_status", lambda: (True, "ready"))
+    monkeypatch.setattr(coach.llm, "create_llm", lambda: llm)
     at = AppTest.from_file(str(APP), default_timeout=60)
     at.run()
     return at
@@ -50,9 +50,8 @@ def test_review_mode_end_to_end(app):
     assert any("Minus subtracts." in m.markdown[0].value for m in at.chat_message)
 
 
-def test_start_disabled_without_api_key(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
-    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: False)
+def test_start_disabled_when_model_unavailable(monkeypatch):
+    monkeypatch.setattr(coach.llm, "llm_status", lambda: (False, "Ollama is not running."))
     at = AppTest.from_file(str(APP), default_timeout=60).run()
     assert _button(at, "Start debugging").disabled
+    assert any("Ollama is not running." in e.value for e in at.error)

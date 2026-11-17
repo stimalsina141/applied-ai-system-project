@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from coach import config
 from coach.agent import STATUS_LABELS, DebugSession, SessionError
 from coach.examples import list_examples
-from coach.llm import ClaudeLLM, LLMError, api_key_available
+from coach.llm import LLMError, create_llm, llm_status
 from coach.report import build_report, reliability_rows
 from coach.workspace import Workspace, WorkspaceError
 
@@ -41,10 +41,11 @@ with st.sidebar:
     st.header("🩺 AI Debugging Coach")
     st.caption("Understand, fix, and verify Python bugs.")
 
-    if api_key_available():
-        st.success("Anthropic API key found", icon="🔑")
+    model_ready, model_message = llm_status()
+    if model_ready:
+        st.success(model_message, icon="🤖")
     else:
-        st.error("No API key. Copy `.env.example` to `.env` and add your key.", icon="🔑")
+        st.error(model_message, icon="🤖")
 
     st.subheader("Settings")
     auto_mode = st.toggle(
@@ -53,7 +54,10 @@ with st.sidebar:
              "On: the coach runs the whole loop by itself (still only in a sandbox).",
     )
     max_attempts = st.slider("Max repair attempts", 1, config.MAX_ATTEMPTS, config.MAX_ATTEMPTS)
-    st.caption(f"Model: `{config.MODEL}` · effort `{config.EFFORT}`")
+    if config.PROVIDER == "claude":
+        st.caption(f"Model: `{config.MODEL}` (Claude API) · effort `{config.EFFORT}`")
+    else:
+        st.caption(f"Model: `{config.MODEL}` (free, runs locally with Ollama)")
 
     if st.button("Start over", width="stretch"):
         st.session_state.pop("session", None)
@@ -111,11 +115,11 @@ if session is None:
             error = st.text_area("Error message or traceback (optional)", height=100)
         symptom = st.text_area("What is going wrong?", placeholder="add(2, 3) returns -1 instead of 5.")
 
-    if st.button("Start debugging", type="primary", disabled=not api_key_available()):
+    if st.button("Start debugging", type="primary", disabled=not model_ready):
         try:
             if workspace is None:
                 workspace = Workspace.from_paste(code, tests, filename=filename, symptom=symptom, error=error)
-            new_session = DebugSession(workspace, ClaudeLLM(), max_attempts=max_attempts)
+            new_session = DebugSession(workspace, create_llm(), max_attempts=max_attempts)
         except WorkspaceError as e:
             st.error(str(e))
             st.stop()

@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from coach.agent import DebugSession
 from coach.examples import get_example, list_examples
-from coach.llm import ClaudeLLM, api_key_available
+from coach.llm import create_llm, llm_status
 from coach.report import build_report
 from coach.workspace import Workspace, WorkspaceError
 
@@ -48,11 +48,12 @@ def main(argv=None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 2
 
-    if not api_key_available():
-        print("Error: set ANTHROPIC_API_KEY (see .env.example).", file=sys.stderr)
+    ready, message = llm_status()
+    if not ready:
+        print(f"Error: {message}", file=sys.stderr)
         return 2
 
-    session = DebugSession(workspace, ClaudeLLM(), max_attempts=args.max_attempts)
+    session = DebugSession(workspace, create_llm(), max_attempts=args.max_attempts)
     print(f"Debugging {workspace.name} (session {session.id})...", file=sys.stderr)
     session.run_auto()
     for a in session.attempts:

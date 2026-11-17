@@ -41,3 +41,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Keep the example env file
+!.env.example
+
+# Coach workflow logs
+logs/

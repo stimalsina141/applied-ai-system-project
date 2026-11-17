@@ -9,6 +9,10 @@ bug, tests, and a list of the functions that contain the bug) and measures:
 - Attempts used and guardrail blocks
 - Scope:             whether kept patches changed anything outside declared targets
 - Consistency:       with --runs > 1, whether repeated runs agree on status and location
+- Confidence:        fix rate grouped by the AI's own confidence rating
+
+Each run's full report and diffs are saved under eval/results/transcripts/
+so the AI's actual outputs can be read and graded by a person.
 
 Usage:
     python -m eval.run_eval                     # every example, one run each
@@ -27,12 +31,39 @@ from dotenv import load_dotenv
 
 from coach.agent import STATUS_LABELS, DebugSession
 from coach.examples import list_examples
-from coach.llm import ClaudeLLM, api_key_available
+from coach.llm import create_llm, llm_status
+from coach.report import build_report, split_code
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
-def evaluate_once(example, llm, max_attempts: int) -> dict:
+def transcript(session: DebugSession) -> str:
+    """The AI's explanation, every patch it proposed, and the final report."""
+    parts = [f"# Transcript: {session.workspace.name} (session {session.id})", ""]
+    if session.diagnosis:
+        explanation, code = split_code(session.diagnosis.explanation)
+        example_prose, example_code = split_code(session.diagnosis.small_example)
+        parts += ["## Explanation shown to the learner", "", explanation, ""]
+        if example_prose:
+            parts += [example_prose, ""]
+        for block in (code, example_code):
+            if block:
+                parts += ["Code example (hidden in the app until the fix is tested):", "",
+                          "```python", block, "```", ""]
+    for a in session.attempts:
+        parts += [f"## Attempt {a.number}: {a.proposal.plan}", ""]
+        if a.error:
+            parts += [f"Blocked by guardrail: {a.error}", ""]
+        for diff in a.diff:
+            parts += ["```diff", diff.unified.rstrip(), "```", ""]
+        if a.test_run:
+            parts += [f"Tests: {a.test_run.headline()} ({'kept' if a.kept else 'discarded'}: {a.keep_reason})", ""]
+        if a.analysis:
+            parts += [f"Analysis: {a.analysis.next_step}", ""]
+    return "\n".join(parts) + "\n" + build_report(session)
+
+
+def evaluate_once(example, llm, max_attempts: int, transcript_dir: Path | None = None) -> dict:
     workspace = example.workspace()
     expected = set(workspace.expected.get("functions", []))
     session = DebugSession(workspace, llm, max_attempts=max_attempts)
@@ -43,6 +74,9 @@ def evaluate_once(example, llm, max_attempts: int) -> dict:
     pointed = {f.function.removesuffix("()") for f in session.diagnosis.findings} if session.diagnosis else set()
     pointed.discard("<module>")
     found = expected & pointed
+    if transcript_dir:
+        transcript_dir.mkdir(parents=True, exist_ok=True)
+        (transcript_dir / f"{example.key}-{session.id}.md").write_text(transcript(session))
     return {
         "example": example.key,
         "session_id": session.id,
@@ -82,8 +116,16 @@ def summarize(results: list[dict]) -> dict:
                 "location_agreement": locations.most_common(1)[0][1] / len(runs),
             }
 
+    by_confidence = {}
+    for r in results:
+        by_confidence.setdefault(r["confidence"] or "none", []).append(r["fixed"])
+
     return {
         "runs": len(results),
+        "fix_rate_by_confidence": {
+            level: {"runs": len(fixed), "fix_rate": _mean(fixed)}
+            for level, fixed in sorted(by_confidence.items())
+        },
         "fix_rate": _mean([r["fixed"] for r in results]),
         "diagnosis_recall": _mean([r["diagnosis_recall"] for r in results]),
         "diagnosis_precision": _mean([r["diagnosis_precision"] for r in results]),
@@ -115,6 +157,9 @@ def to_markdown(summary: dict, results: list[dict], model: str) -> str:
             f"| {r['example']} | {STATUS_LABELS.get(r['status'], r['status'])} | {r['tests_before']} | "
             f"{r['tests_after']} | {recall} | {r['attempts']} | {r['seconds']} |"
         )
+    lines += ["", "| AI confidence | Runs | Fix rate |", "|---|---|---|"]
+    for level, c in summary["fix_rate_by_confidence"].items():
+        lines.append(f"| {level} | {c['runs']} | {c['fix_rate']:.0%} |")
     if summary["consistency"]:
         lines += ["", "| Example | Same status across runs | Same location across runs |", "|---|---|---|"]
         for key, c in summary["consistency"].items():
@@ -130,8 +175,9 @@ def main(argv=None) -> int:
     parser.add_argument("--max-attempts", type=int, default=3)
     args = parser.parse_args(argv)
 
-    if not api_key_available():
-        print("Error: set ANTHROPIC_API_KEY to run the evaluation (see .env.example).", file=sys.stderr)
+    ready, message = llm_status()
+    if not ready:
+        print(f"Error: {message}", file=sys.stderr)
         return 2
 
     examples = [e for e in list_examples() if not args.examples or e.key in args.examples]
@@ -139,18 +185,19 @@ def main(argv=None) -> int:
         print("No matching examples.", file=sys.stderr)
         return 2
 
-    llm = ClaudeLLM()
+    llm = create_llm()
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    transcript_dir = RESULTS_DIR / "transcripts" / stamp
     results = []
     for example in examples:
         for run in range(1, args.runs + 1):
             print(f"[{example.key}] run {run}/{args.runs} ...", file=sys.stderr, flush=True)
-            result = evaluate_once(example, llm, args.max_attempts)
+            result = evaluate_once(example, llm, args.max_attempts, transcript_dir)
             print(f"  -> {STATUS_LABELS.get(result['status'])} in {result['attempts']} attempt(s)", file=sys.stderr)
             results.append(result)
 
     summary = summarize(results)
     RESULTS_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     (RESULTS_DIR / f"{stamp}.json").write_text(
         json.dumps({"model": llm.model, "summary": summary, "results": results}, indent=2))
     markdown = to_markdown(summary, results, llm.model)

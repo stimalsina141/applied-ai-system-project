@@ -1,0 +1,245 @@
+{
+  "model": "qwen2.5-coder:3b",
+  "summary": {
+    "runs": 10,
+    "fix_rate_by_confidence": {
+      "high": {
+        "runs": 10,
+        "fix_rate": 0.2
+      }
+    },
+    "fix_rate": 0.2,
+    "diagnosis_recall": 0.9,
+    "diagnosis_precision": 0.9333333333333333,
+    "mean_attempts": 2.6,
+    "guardrail_blocks": 6,
+    "out_of_scope_runs": 0,
+    "consistency": {
+      "number_guessing_game": {
+        "status_agreement": 1.0,
+        "location_agreement": 1.0
+      },
+      "grade_calculator": {
+        "status_agreement": 1.0,
+        "location_agreement": 1.0
+      },
+      "shopping_cart": {
+        "status_agreement": 1.0,
+        "location_agreement": 1.0
+      },
+      "temperature_converter": {
+        "status_agreement": 1.0,
+        "location_agreement": 1.0
+      },
+      "word_stats": {
+        "status_agreement": 1.0,
+        "location_agreement": 0.5
+      }
+    }
+  },
+  "results": [
+    {
+      "example": "number_guessing_game",
+      "session_id": "6cf693a5",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "11 passed, 17 failed in 0.39s",
+      "tests_after": "12 passed, 16 failed in 0.53s",
+      "diagnosis_recall": 0.75,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "check_guess",
+        "init_game",
+        "update_score"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 2,
+      "out_of_scope_changes": [],
+      "seconds": 351.6,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "number_guessing_game",
+      "session_id": "6a4aff34",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "11 passed, 17 failed in 0.47s",
+      "tests_after": "12 passed, 16 failed in 0.47s",
+      "diagnosis_recall": 0.75,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "check_guess",
+        "init_game",
+        "update_score"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 2,
+      "out_of_scope_changes": [],
+      "seconds": 285.0,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "grade_calculator",
+      "session_id": "d0514607",
+      "status": "fixed",
+      "fixed": true,
+      "tests_before": "3 passed, 6 failed in 0.51s",
+      "tests_after": "9 passed in 0.48s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "class_average",
+        "letter_grade"
+      ],
+      "confidence": "high",
+      "attempts": 1,
+      "guardrail_blocks": 0,
+      "out_of_scope_changes": [],
+      "seconds": 91.2,
+      "stop_reason": "All tests pass."
+    },
+    {
+      "example": "grade_calculator",
+      "session_id": "bda5065b",
+      "status": "fixed",
+      "fixed": true,
+      "tests_before": "3 passed, 6 failed in 0.51s",
+      "tests_after": "9 passed in 0.44s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "class_average",
+        "letter_grade"
+      ],
+      "confidence": "high",
+      "attempts": 1,
+      "guardrail_blocks": 0,
+      "out_of_scope_changes": [],
+      "seconds": 74.3,
+      "stop_reason": "All tests pass."
+    },
+    {
+      "example": "shopping_cart",
+      "session_id": "3debec3d",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "2 passed, 2 failed in 0.35s",
+      "tests_after": "3 passed, 1 failed in 0.45s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "add_item",
+        "cart_total"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 1,
+      "out_of_scope_changes": [],
+      "seconds": 144.3,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "shopping_cart",
+      "session_id": "c464bea3",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "2 passed, 2 failed in 0.38s",
+      "tests_after": "3 passed, 1 failed in 0.43s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "add_item",
+        "cart_total"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 1,
+      "out_of_scope_changes": [],
+      "seconds": 137.3,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "temperature_converter",
+      "session_id": "6c940d35",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "1 passed, 3 failed in 0.37s",
+      "tests_after": "3 passed, 1 failed in 0.43s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 0.6666666666666666,
+      "pointed_functions": [
+        "celsius_to_fahrenheit",
+        "fahrenheit_to_celsius",
+        "is_freezing"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 0,
+      "out_of_scope_changes": [],
+      "seconds": 178.3,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "temperature_converter",
+      "session_id": "95723b2f",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "1 passed, 3 failed in 0.35s",
+      "tests_after": "3 passed, 1 failed in 0.44s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 0.6666666666666666,
+      "pointed_functions": [
+        "celsius_to_fahrenheit",
+        "fahrenheit_to_celsius",
+        "is_freezing"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 0,
+      "out_of_scope_changes": [],
+      "seconds": 171.7,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "word_stats",
+      "session_id": "8829634f",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "1 passed, 3 failed in 0.42s",
+      "tests_after": "2 passed, 2 failed in 0.85s",
+      "diagnosis_recall": 1.0,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "summary",
+        "word_count"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 0,
+      "out_of_scope_changes": [],
+      "seconds": 184.4,
+      "stop_reason": "Stopped after 3 attempts."
+    },
+    {
+      "example": "word_stats",
+      "session_id": "c17d3775",
+      "status": "partially_fixed",
+      "fixed": false,
+      "tests_before": "1 passed, 3 failed in 0.39s",
+      "tests_after": "2 passed, 2 failed in 0.36s",
+      "diagnosis_recall": 0.5,
+      "diagnosis_precision": 1.0,
+      "pointed_functions": [
+        "summary"
+      ],
+      "confidence": "high",
+      "attempts": 3,
+      "guardrail_blocks": 0,
+      "out_of_scope_changes": [],
+      "seconds": 163.4,
+      "stop_reason": "Stopped after 3 attempts."
+    }
+  ]
+}

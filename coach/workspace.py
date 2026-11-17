@@ -7,6 +7,7 @@ sandbox directory by the test runner.
 import ast
 import difflib
 import json
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
@@ -120,8 +121,27 @@ def _function_name(name: str) -> str:
     return name.strip().removesuffix("()")
 
 
+def _parse_new_function(code: str, name: str, label: str) -> list[str]:
+    """Check that `code` is exactly one definition of `name`; return its lines from the `def` line on."""
+    code = textwrap.dedent(code).strip("\n")
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        raise PatchError(f"{label}: the new code has a syntax error on line {e.lineno}: {e.msg}.") from e
+    node = tree.body[0] if len(tree.body) == 1 else None
+    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or node.name != name:
+        raise PatchError(f"{label}: `new_code` must be the complete function, starting with "
+                         f"`def {name}(`, and nothing else.")
+    return code.splitlines()[node.lineno - 1:]  # decorators stay as they are in the file
+
+
 def apply_patch(files: dict[str, str], editable: set[str], patch: PatchProposal) -> dict[str, str]:
-    """Apply a patch to a copy of `files`, enforcing the coach's guardrails."""
+    """Apply a patch to a copy of `files`, enforcing the coach's guardrails.
+
+    Each edit replaces exactly the lines of its declared function, located with
+    Python's own parser, so a patch cannot change anything outside the functions
+    it named.
+    """
     if not patch.targets:
         raise PatchError("The patch did not identify which function or lines it changes.")
     if not patch.edits:
@@ -139,28 +159,21 @@ def apply_patch(files: dict[str, str], editable: set[str], patch: PatchProposal)
         function = _function_name(edit.function)
         if (edit.file, function) not in targets:
             raise PatchError(f"{label}: function was not declared as a target before editing.")
-        if not edit.find:
-            raise PatchError(f"{label}: `find` text is empty.")
 
         source = new_files[edit.file]
-        count = source.count(edit.find)
-        if count == 0:
-            raise PatchError(f"{label}: `find` text was not found in the current file.")
-        if count > 1:
-            raise PatchError(f"{label}: `find` text appears {count} times; it must be unique.")
+        spans = function_spans(source)
+        if function not in spans:
+            raise PatchError(f"{label}: function {function!r} does not exist in {edit.file}. "
+                             "Only code inside functions can be edited.")
+        new_lines = _parse_new_function(edit.new_code, function.rsplit(".", 1)[-1], label)
 
-        if function != "<module>":
-            spans = function_spans(source)
-            if function not in spans:
-                raise PatchError(f"{label}: function {function!r} does not exist in {edit.file}.")
-            start, end = spans[function]
-            offset = source.index(edit.find)
-            first_line = source.count("\n", 0, offset) + 1
-            last_line = first_line + edit.find.rstrip("\n").count("\n")
-            if first_line < start or last_line > end:
-                raise PatchError(f"{label}: edit falls outside the target function {function!r}.")
-
-        new_files[edit.file] = source.replace(edit.find, edit.replace, 1)
+        lines = source.splitlines(keepends=True)
+        start, end = spans[function]
+        while not lines[start - 1].lstrip().startswith(("def ", "async def ", "class ")):
+            start += 1  # skip decorators
+        indent = lines[start - 1][: len(lines[start - 1]) - len(lines[start - 1].lstrip())]
+        body = "".join(f"{indent}{line}\n" if line.strip() else "\n" for line in new_lines)
+        new_files[edit.file] = "".join(lines[: start - 1]) + body + "".join(lines[end:])
 
     return new_files
 

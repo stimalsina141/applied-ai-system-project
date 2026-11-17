@@ -64,7 +64,8 @@ def test_stops_after_max_attempts(calc_workspace):
 def test_patch_that_breaks_passing_test_is_discarded(calc_workspace):
     bad = patch("a - b", "a + b", function="add")
     bad.targets.append(bad.targets[0].model_copy(update={"function": "double"}))
-    bad.edits.append(bad.edits[0].model_copy(update={"function": "double", "find": "x * 2", "replace": "x * 3"}))
+    bad.edits.append(bad.edits[0].model_copy(update={"function": "double",
+                                                      "new_code": "def double(x):\n    return x * 3\n"}))
     llm = ScriptedLLM(diagnosis(), bad, analysis("give_up"))
     session = DebugSession(calc_workspace, llm)
     session.run_auto()

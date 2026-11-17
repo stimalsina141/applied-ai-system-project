@@ -1,4 +1,4 @@
-"""Shared fixtures: a scripted stand-in for Claude so tests run offline."""
+"""Shared fixtures: a scripted stand-in for the AI model so tests run offline."""
 import pytest
 
 from coach.schemas import Diagnosis, Edit, FailureAnalysis, Finding, PatchProposal, QualityReview, Target
@@ -41,11 +41,20 @@ def diagnosis(needs_more_info=False, function="add"):
     )
 
 
+def function_source(source, function):
+    from coach.workspace import function_spans
+    start, end = function_spans(source)[function]
+    return "".join(source.splitlines(keepends=True)[start - 1:end])
+
+
 def patch(find, replace, function="add", file="calc.py"):
+    """A patch whose new version of `function` has `find` replaced with `replace`."""
+    source = {"calc.py": CALC, "test_calc.py": CALC_TESTS}[file]
     return PatchProposal(
         targets=[Target(file=file, function=function, lines="2")],
         plan=f"Replace {find!r} with {replace!r}.",
-        edits=[Edit(file=file, function=function, find=find, replace=replace)],
+        edits=[Edit(file=file, function=function,
+                    new_code=function_source(source, function).replace(find, replace))],
         summary="Only the return line of add changed.",
         assumptions=[],
     )

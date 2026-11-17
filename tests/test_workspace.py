@@ -37,9 +37,25 @@ def test_apply_patch_returns_new_copy():
 
 
 def test_edit_must_be_inside_declared_function():
-    # "x * 2" lives in double(), but the patch claims to edit add().
-    with pytest.raises(PatchError, match="outside the target function"):
-        apply_patch({"calc.py": CALC}, {"calc.py"}, patch("x * 2", "x + x", function="add"))
+    # The patch claims to edit add() but its new code defines double() instead.
+    p = patch("a - b", "a + b")
+    p.edits[0].new_code = "def double(x):\n    return x + x\n"
+    with pytest.raises(PatchError, match="must be the complete function, starting with `def add\\(`"):
+        apply_patch({"calc.py": CALC}, {"calc.py"}, p)
+    # Extra code after the function is rejected too.
+    p.edits[0].new_code = "def add(a, b):\n    return a + b\n\nimport os\n"
+    with pytest.raises(PatchError, match="nothing else"):
+        apply_patch({"calc.py": CALC}, {"calc.py"}, p)
+
+
+def test_only_the_declared_function_changes():
+    source = "class Cart:\n    @property\n    def total(self):\n        return 1\n\n    def size(self):\n        return 0\n"
+    p = patch("a - b", "a + b")
+    p.targets[0].file, p.targets[0].function = "cart.py", "Cart.total"
+    p.edits[0].file, p.edits[0].function = "cart.py", "Cart.total"
+    p.edits[0].new_code = "def total(self):\n    return 2\n"
+    result = apply_patch({"cart.py": source}, {"cart.py"}, p)["cart.py"]
+    assert result == source.replace("return 1", "return 2")  # indentation and decorator kept
 
 
 def test_edit_function_must_be_declared_as_target():
@@ -49,12 +65,16 @@ def test_edit_function_must_be_declared_as_target():
         apply_patch({"calc.py": CALC}, {"calc.py"}, p)
 
 
-def test_find_text_must_exist_and_be_unique():
-    with pytest.raises(PatchError, match="not found"):
-        apply_patch({"calc.py": CALC}, {"calc.py"}, patch("a * b", "a + b"))
-    with pytest.raises(PatchError, match="must be unique"):
-        apply_patch({"calc.py": CALC + "\ndef sub(a, b):\n    return a - b\n"},
-                    {"calc.py"}, patch("return a - b", "return a + b"))
+def test_target_function_must_exist():
+    p = patch("a - b", "a + b")
+    p.targets[0].function = p.edits[0].function = "subtract"
+    with pytest.raises(PatchError, match="does not exist"):
+        apply_patch({"calc.py": CALC}, {"calc.py"}, p)
+
+
+def test_new_code_with_syntax_error_is_rejected():
+    with pytest.raises(PatchError, match="syntax error"):
+        apply_patch({"calc.py": CALC}, {"calc.py"}, patch("a - b", "a +"))
 
 
 def test_patch_must_identify_targets():

@@ -1,6 +1,6 @@
 """Structured outputs the AI must return at each step of the workflow.
 
-Claude's responses are constrained to these Pydantic models, so the
+The model's responses are constrained to these Pydantic models, so the
 application logic can validate every field before acting on it.
 """
 from typing import Literal
@@ -51,20 +51,19 @@ class Diagnosis(BaseModel):
 
 class Target(BaseModel):
     file: str
-    function: str = Field(description='Function to change, or "<module>" for top-level code.')
+    function: str = Field(description='Function to change, e.g. "add" or "Cart.total" for a method.')
     lines: str = Field(description="Line numbers being changed, from the numbered listing.")
 
 
 class Edit(BaseModel):
     file: str
     function: str = Field(description="Must match one of the declared targets.")
-    find: str = Field(
+    new_code: str = Field(
         description=(
-            "Exact text copied from the current file (without line numbers) to replace. "
-            "Include enough lines to be unique."
+            "The complete new version of the function, from its `def` line to its last line, "
+            "with the bug fixed and every other line kept the same."
         )
     )
-    replace: str = Field(description="The new text that replaces `find`.")
 
 
 class PatchProposal(BaseModel):

@@ -81,8 +81,9 @@ Earlier attempts:
 {feedback}
 Instructions:
 1. First list the targets: the exact file, function, and lines you will change.
-2. Then write edits. Each edit's `find` must be copied exactly from the current
-   file (without the line-number prefix) and must lie inside its target function.
+2. Then write one edit per target function. `new_code` is the complete new
+   version of that function (no line-number prefixes), from its `def` line to
+   its last line. Keep every line that is not part of the fix exactly as it is.
 3. Only edit these files: {", ".join(sorted(editable))}.
 4. Keep the change as small as possible and say what you deliberately did not change."""
 
